@@ -8,17 +8,17 @@ Usage:
     monbat run
     monbat stats
 """
-
 from __future__ import print_function
 
-import sys
-import subprocess as sub
-import shlex
 import re
+import shlex
+import subprocess as sub
+import sys
 import time
-from tempfile import mktemp
-from datetime import datetime
 from collections import OrderedDict
+from datetime import datetime
+from tempfile import mktemp
+
 from docopt import docopt
 
 

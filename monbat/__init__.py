@@ -135,10 +135,14 @@ class BatteryMonitor(object):
         show()
 
 
-if __name__ == '__main__':
+def run():
     args = docopt(__doc__)
     monitor = BatteryMonitor()
     if args["stats"]:
         monitor.print_stats()
     elif args["run"]:
         monitor.run(args["--plot"])
+
+
+if __name__ == '__main__':
+    run()

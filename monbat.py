@@ -23,6 +23,7 @@ from docopt import docopt
 
 
 PROPERTIES = OrderedDict([
+    ("IsCharging", {"type": bool, "unit": None}),
     ("CurrentCapacity", {"type": int, "unit": "mAh"}),
     ("MaxCapacity", {"type": int, "unit": "mAh"}),
     ("DesignCapacity", {"type": int, "unit": "mAh"}),
@@ -40,10 +41,14 @@ def _battery_status():
 
 
 def _parse_value(key, data, _type=int):
-    if _type == int:
+    converter = lambda x: x
+    if _type is int:
         value_expr = "\d+"
-    return _type(re.search('"{}[^"]*"\s*=\s*({})'.format(
-        key, value_expr), data).group(1))
+    elif _type is bool:
+        value_expr = "(Yes|No)"
+        converter = lambda x: x == "Yes"
+    return _type(converter(re.search('"{}[^"]*"\s*=\s*({})'.format(
+        key, value_expr), data).group(1)))
 
 
 def _format_key(key):
@@ -54,24 +59,27 @@ class BatteryMonitor(object):
 
     def __init__(self):
         self.current = dict.fromkeys(PROPERTIES, "")
-        self.history = {"time": [], "capacity": [], "level": []}
+        self.history = {
+            "time": [], "capacity": [], "level": [], "charging": []}
 
     def update(self):
         self.current.update(_battery_status())
 
-    def print_statistics(self):
+    def print_stats(self):
         self.update()
         for key, meta in PROPERTIES.items():
             self._print_stat(key, meta["unit"])
 
     def _print_stat(self, key, unit=None):
         unit = (unit or "")
-        print("{0:.<30}{1:.>10} {2}".format(
+        print("{0:.<30}{1!s:.>10} {2}".format(
             _format_key(key), self.current[key], unit))
 
     def print_status(self):
-        print("\r{:.1f} mAh => {:.1f}%".format(
+        is_charging = self.history["charging"][-1]
+        print("\r{:.1f} mAh {} {:.1f}%".format(
             self.history["capacity"][-1],
+            "+" if is_charging else "-",
             self.history["level"][-1]), end='')
         sys.stdout.flush()
 
@@ -79,6 +87,7 @@ class BatteryMonitor(object):
         self.update()
         current_capacity = self.current["CurrentCapacity"]
         max_capacity = self.current["MaxCapacity"]
+        self.history["charging"].append(self.current["IsCharging"])
         self.history["time"].append(datetime.isoformat(datetime.now()))
         self.history["capacity"].append(float(current_capacity))
         self.history["level"].append(
@@ -95,10 +104,13 @@ class BatteryMonitor(object):
         self.plot()
 
     def plot(self):
-        import numpy as np
-        from bokeh.plotting import (
-            figure, line, curplot, show, hold, output_file)
-        from bokeh.objects import Range1d
+        try:
+            import numpy as np
+            from bokeh.plotting import (
+                figure, line, curplot, show, hold, output_file)
+            from bokeh.objects import Range1d
+        except ImportError:
+            return
         output_file(mktemp())
         hold()
         figure(y_range=Range1d(start=0, end=100), x_axis_type="datetime")
@@ -113,6 +125,6 @@ if __name__ == '__main__':
     args = docopt(__doc__)
     monitor = BatteryMonitor()
     if args["stats"]:
-        monitor.print_statistics()
+        monitor.print_stats()
     elif args["run"]:
         monitor.run()

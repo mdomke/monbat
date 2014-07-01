@@ -26,14 +26,15 @@ from docopt import docopt
 
 
 PROPERTIES = OrderedDict([
-    ("IsCharging", {"type": bool, "unit": None}),
-    ("CurrentCapacity", {"type": int, "unit": "mAh"}),
-    ("MaxCapacity", {"type": int, "unit": "mAh"}),
-    ("DesignCapacity", {"type": int, "unit": "mAh"}),
-    ("CycleCount", {"type": int, "unit": "cycles"}),
-    ("DesignCycleCount", {"type": int, "unit": "cycles"}),
-    ("TimeRemaining", {"type": int, "unit": "min"}),
-    ("Voltage", {"type": int, "unit": "mV"})
+    ("IsCharging", {"type": bool, "unit": None, "show": False}),
+    ("ExternalConnected", {"type": bool, "unit": None, "show": False}),
+    ("CurrentCapacity", {"type": int, "unit": "mAh", "show": True}),
+    ("MaxCapacity", {"type": int, "unit": "mAh", "show": True}),
+    ("DesignCapacity", {"type": int, "unit": "mAh", "show": True}),
+    ("CycleCount", {"type": int, "unit": "cycles", "show": True}),
+    ("DesignCycleCount", {"type": int, "unit": "cycles", "show": True}),
+    ("TimeRemaining", {"type": int, "unit": "min", "show": True}),
+    ("Voltage", {"type": int, "unit": "mV", "show": True})
 ])
 
 
@@ -81,9 +82,10 @@ class BatteryMonitor(object):
     def print_stats(self):
         self.update()
         for key, meta in PROPERTIES.items():
-            self._print_stat(key, meta["unit"])
+            if meta["show"]:
+                self._print_stat_value(key, meta["unit"])
 
-    def _print_stat(self, key, unit=None):
+    def _print_stat_value(self, key, unit=None):
         unit = (unit or "")
         print("{0:.<30}{1!s:.>10} {2}".format(
             _format_key(key), self.current[key], unit))
@@ -93,7 +95,10 @@ class BatteryMonitor(object):
             self.display.maxval = self.current["MaxCapacity"]
             self.display.start()
             self.started = True
-        self.progress.marker = ">" if self.current["IsCharging"] else "<"
+        if self.current["ExternalConnected"]:
+            self.progress.marker = ">" if self.current["IsCharging"] else "#"
+        else:
+            self.progress.marker = "<"
         self.display.update(self.current["CurrentCapacity"])
 
     def _step(self):

@@ -5,16 +5,19 @@
 Monitor battery capacity of a portable Mac computer.
 
 Usage:
-    monbat run
+    monbat run [--plot]
     monbat stats
+
+Options:
+    --plot          Create a graph of the charging data
 """
 from __future__ import print_function
 
 import re
 import shlex
 import subprocess as sub
-import sys
 import time
+from progressbar import ProgressBar, Bar, Counter, Percentage
 from collections import OrderedDict
 from datetime import datetime
 from tempfile import mktemp
@@ -55,12 +58,22 @@ def _format_key(key):
     return re.sub('([A-Z])', r' \1', key).strip()
 
 
+class ChargingDisplay(ProgressBar):
+
+    def _need_update(self):
+        return True
+
+
 class BatteryMonitor(object):
 
     def __init__(self):
+        self.progress = Bar()
+        self.display = ChargingDisplay(
+            widgets=[Counter(), " mAh ", Percentage(), " ", self.progress])
         self.current = dict.fromkeys(PROPERTIES, "")
         self.history = {
             "time": [], "capacity": [], "level": [], "charging": []}
+        self.started = False
 
     def update(self):
         self.current.update(_battery_status())
@@ -76,12 +89,12 @@ class BatteryMonitor(object):
             _format_key(key), self.current[key], unit))
 
     def print_status(self):
-        is_charging = self.history["charging"][-1]
-        print("\r{:.1f} mAh {} {:.1f}%".format(
-            self.history["capacity"][-1],
-            "+" if is_charging else "-",
-            self.history["level"][-1]), end='')
-        sys.stdout.flush()
+        if not self.started:
+            self.display.maxval = self.current["MaxCapacity"]
+            self.display.start()
+            self.started = True
+        self.progress.marker = ">" if self.current["IsCharging"] else "<"
+        self.display.update(self.current["CurrentCapacity"])
 
     def _step(self):
         self.update()
@@ -94,14 +107,15 @@ class BatteryMonitor(object):
             float(current_capacity) / float(max_capacity) * 100)
         self.print_status()
 
-    def run(self):
+    def run(self, plot=False):
         while True:
             try:
                 self._step()
                 time.sleep(1)
             except KeyboardInterrupt:
                 break
-        self.plot()
+        if plot:
+            self.plot()
 
     def plot(self):
         try:
@@ -127,4 +141,4 @@ if __name__ == '__main__':
     if args["stats"]:
         monitor.print_stats()
     elif args["run"]:
-        monitor.run()
+        monitor.run(args["--plot"])
